@@ -16,7 +16,6 @@ import {
   X, 
   CheckCircle2, 
   AlertCircle, 
-  FileType, 
   Play, 
   FileStack,
   Clock,
@@ -230,8 +229,11 @@ export default function Home() {
                     min={1} 
                     max={100} 
                     step={1} 
-                    onValueChange={(val) => setQuality(val[0])}
-                    className="py-4"
+                    onValueChange={(val) => {
+                      if (val && val.length > 0) {
+                        setQuality(val[0]);
+                      }
+                    }}
                   />
                   <p className="text-[10px] text-slate-400 leading-tight">
                     Une qualité plus basse réduit considérablement le poids du fichier.
