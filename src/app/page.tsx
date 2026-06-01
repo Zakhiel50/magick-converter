@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,9 +19,13 @@ import {
   Play, 
   FileStack,
   Clock,
-  Sparkles
+  Sparkles,
+  Monitor,
+  Tablet,
+  Smartphone
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 type ConversionStatus = 'original' | 'processing' | 'completed' | 'error';
 
@@ -43,6 +47,15 @@ const FORMATS = [
   { id: 'webp', label: 'WebP', description: 'Optimisé web', color: 'bg-emerald-500', badge: 'Rapide' },
   { id: 'avif', label: 'AVIF', description: 'Nouvelle génération', color: 'bg-indigo-500', badge: 'Léger' },
   { id: 'gif', label: 'GIF', description: 'Animation', color: 'bg-purple-500' },
+];
+
+const PRESETS = [
+  { id: 'mobile-paysage', label: 'Mobile paysage', width: '667', height: '375', icon: Smartphone },
+  { id: 'tablet-paysage', label: 'Tablette paysage', width: '1024', height: '768', icon: Tablet },
+  { id: 'desktop-paysage', label: 'Desktop paysage', width: '1440', height: '900', icon: Monitor },
+  { id: 'mobile-portrait', label: 'Mobile portrait', width: '375', height: '667', icon: Smartphone },
+  { id: 'tablet-portrait', label: 'Tablette portrait', width: '768', height: '1024', icon: Tablet },
+  { id: 'desktop-portrait', label: 'Desktop portrait', width: '900', height: '1440', icon: Monitor },
 ];
 
 export default function Home() {
@@ -184,6 +197,11 @@ export default function Home() {
     }
   };
 
+  const applyPreset = (p: typeof PRESETS[0]) => {
+    setWidth(p.width);
+    setHeight(p.height);
+  };
+
   return (
     <main className="min-h-screen bg-[#fafafa] relative overflow-hidden flex flex-col items-center justify-start p-6 pt-12">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/50 rounded-full blur-3xl animate-pulse" />
@@ -198,7 +216,7 @@ export default function Home() {
           <motion.div 
             initial={{ scale: 0.8 }}
             animate={{ scale: 1 }}
-            className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200"
+            className="mx-auto w-16 h-16 bg-linear-to-br from-blue-500 to-indigo-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-blue-200"
           >
             <ImageIcon className="w-8 h-8" />
           </motion.div>
@@ -264,15 +282,44 @@ export default function Home() {
 
                 <div className="space-y-4">
                   <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Dimensions</Label>
+                  
+                  <div className="flex gap-2 mb-4 flex-wrap">
+                    {PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => applyPreset(p)}
+                        className={cn(
+                          "flex-1 flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all hover:bg-slate-50 max-w-20",
+                          width === p.width && height === p.height
+                            ? "border-indigo-200 bg-indigo-50/50 text-indigo-600 shadow-sm"
+                            : "border-slate-100 bg-white text-slate-500"
+                        )}
+                      >
+                        <p.icon className="w-4 h-4" />
+                        <span className="text-[10px] font-bold uppercase">{p.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
-                    <Input 
-                      type="number" placeholder="Largeur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
-                      value={width} onChange={(e) => setWidth(e.target.value)} 
-                    />
-                    <Input 
-                      type="number" placeholder="Hauteur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
-                      value={height} onChange={(e) => setHeight(e.target.value)} 
-                    />
+                    <div>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        Largeur                  
+                      </p>
+                      <Input 
+                        type="number" placeholder="Largeur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
+                        value={width} onChange={(e) => setWidth(e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        Hauteur                  
+                      </p>
+                      <Input 
+                        type="number" placeholder="Hauteur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
+                        value={height} onChange={(e) => setHeight(e.target.value)} 
+                      />
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -296,7 +343,7 @@ export default function Home() {
                       Tout télécharger
                     </Button>
                     <p className="text-[10px] text-slate-400 text-center px-2 leading-tight">
-                      Note : Si un seul fichier se télécharge, autorisez les "téléchargements multiples" dans les réglages.
+                      Note : Si un seul fichier se télécharge, autorisez les téléchargements multiples dans les réglages.
                     </p>
                   </div>
                 )}
