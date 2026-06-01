@@ -52,12 +52,13 @@ export async function POST(req: NextRequest) {
     }
 
     const outputBuffer = await pipeline.toBuffer();
+    const uint8Array = new Uint8Array(outputBuffer);
     
     // Génération du nom de fichier
     const baseName = originalName.substring(0, originalName.lastIndexOf('.')) || originalName;
     const finalFileName = `${baseName}.${format}`;
     
-    return new NextResponse(outputBuffer, {
+    return new NextResponse(uint8Array, {
       headers: {
         'Content-Type': `image/${format}`,
         'Content-Disposition': `attachment; filename="${finalFileName}"`,
