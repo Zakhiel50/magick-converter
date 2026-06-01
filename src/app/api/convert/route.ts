@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       pipeline = pipeline.resize({
         width: width ? parseInt(width, 10) : undefined,
         height: height ? parseInt(height, 10) : undefined,
-        fit: (width && height) ? 'fill' : 'inside', // 'fill' force les dimensions exactes si les deux sont fournis
+        fit: (width && height) ? 'cover' : 'inside', // 'cover' recadre pour remplir les dimensions sans déformer
       });
     }
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         pipeline = pipeline.gif();
         break;
       default:
-        pipeline = pipeline.toFormat(format as any);
+        pipeline = pipeline.toFormat(format as keyof sharp.FormatEnum);
     }
 
     const outputBuffer = await pipeline.toBuffer();
@@ -64,8 +64,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('API Error:', error);
-    return NextResponse.json({ error: error.message || 'Erreur interne du serveur' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Erreur interne du serveur';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -7,11 +7,11 @@ export async function executable(): Promise<string | null> {
   try {
     await execPromise('magick -version');
     return 'magick';
-  } catch (e) {
+  } catch (_e) {
     try {
       await execPromise('convert -version');
       return 'convert';
-    } catch (e2) {
+    } catch (_e2) {
       return null;
     }
   }

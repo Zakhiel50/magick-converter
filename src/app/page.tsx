@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ImageIcon, 
   Loader2, 
@@ -51,10 +52,10 @@ const FORMATS = [
 
 const PRESETS = [
   { id: 'mobile-paysage', label: 'Mobile paysage', width: '667', height: '375', icon: Smartphone },
-  { id: 'tablet-paysage', label: 'Tablette paysage', width: '1024', height: '768', icon: Tablet },
-  { id: 'desktop-paysage', label: 'Desktop paysage', width: '1440', height: '900', icon: Monitor },
   { id: 'mobile-portrait', label: 'Mobile portrait', width: '375', height: '667', icon: Smartphone },
+  { id: 'tablet-paysage', label: 'Tablette paysage', width: '1024', height: '768', icon: Tablet },
   { id: 'tablet-portrait', label: 'Tablette portrait', width: '768', height: '1024', icon: Tablet },
+  { id: 'desktop-paysage', label: 'Desktop paysage', width: '1440', height: '900', icon: Monitor },
   { id: 'desktop-portrait', label: 'Desktop portrait', width: '900', height: '1440', icon: Monitor },
 ];
 
@@ -65,6 +66,11 @@ export default function Home() {
   const [targetFormat, setTargetFormat] = useState<string>('jpg');
   const [quality, setQuality] = useState<number>(80);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
+  
+  // Toggles for features
+  const [enableResize, setEnableResize] = useState(true);
+  const [enableQuality, setEnableQuality] = useState(true);
+  const [enableFormat, setEnableFormat] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,10 +103,24 @@ export default function Home() {
 
     const formData = new FormData();
     formData.append('file', task.file);
-    formData.append('width', width);
-    formData.append('height', height);
-    formData.append('format', targetFormat);
-    formData.append('quality', quality.toString());
+    
+    if (enableResize) {
+      formData.append('width', width);
+      formData.append('height', height);
+    }
+    
+    if (enableFormat) {
+      formData.append('format', targetFormat);
+    } else {
+      // If format is disabled, use original extension
+      const ext = task.file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      formData.append('format', ext);
+    }
+    
+    if (enableQuality) {
+      formData.append('quality', quality.toString());
+    }
+    
     formData.append('originalName', task.file.name);
 
     try {
@@ -123,10 +143,11 @@ export default function Home() {
         resultBlob: blob, 
         resultUrl: url,
         resultSize: blob.size,
-        format: targetFormat 
+        format: enableFormat ? targetFormat : (task.file.name.split('.').pop()?.toLowerCase() || 'jpg')
       } : t));
-    } catch (err: any) {
-      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'error', error: err.message } : t));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Échec de la conversion';
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: 'error', error: message } : t));
     }
   };
 
@@ -173,15 +194,26 @@ export default function Home() {
     });
   };
 
+  const clearAllTasks = () => {
+    tasks.forEach(t => {
+      URL.revokeObjectURL(t.preview);
+      if (t.resultUrl) URL.revokeObjectURL(t.resultUrl);
+    });
+    setTasks([]);
+  };
+
   const estimateWeight = (originalSize: number) => {
-    const qualityFactor = quality / 100;
+    const qualityFactor = enableQuality ? quality / 100 : 0.9;
     let formatFactor = 0.8; 
     
-    switch (targetFormat) {
+    const format = enableFormat ? targetFormat : 'original';
+
+    switch (format) {
       case 'webp': formatFactor = 0.65; break;
       case 'avif': formatFactor = 0.45; break;
       case 'png': formatFactor = 1.1; break;
       case 'gif': formatFactor = 1.3; break;
+      default: formatFactor = 0.85;
     }
 
     const estimated = originalSize * formatFactor * (0.2 + 0.8 * qualityFactor);
@@ -200,6 +232,7 @@ export default function Home() {
   const applyPreset = (p: typeof PRESETS[0]) => {
     setWidth(p.width);
     setHeight(p.height);
+    setEnableResize(true);
   };
 
   return (
@@ -232,17 +265,23 @@ export default function Home() {
                   <Sparkles className="w-4 h-4 text-indigo-500" />
                   Réglages
                 </CardTitle>
-                <CardDescription>Qualité et dimensions</CardDescription>
+                <CardDescription>Configurez votre conversion</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
-                <div className="space-y-4">
+                <div className={cn("space-y-4 transition-opacity", !enableQuality && "opacity-50")}>
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Qualité</Label>
-                    <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 border-none font-bold">
-                      {quality}%
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Checkbox id="enable-quality" checked={enableQuality} onCheckedChange={(val) => setEnableQuality(!!val)} />
+                      <Label htmlFor="enable-quality" className="text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer">Qualité</Label>
+                    </div>
+                    {enableQuality && (
+                      <Badge variant="secondary" className="bg-indigo-50 text-indigo-600 border-none font-bold">
+                        {quality}%
+                      </Badge>
+                    )}
                   </div>
                   <Slider 
+                    disabled={!enableQuality}
                     value={[quality]} 
                     min={1} 
                     max={100} 
@@ -260,37 +299,53 @@ export default function Home() {
 
                 <Separator className="bg-slate-100" />
 
-                <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Format Cible</Label>
+                <div className={cn("space-y-4 transition-opacity", !enableFormat && "opacity-50")}>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="enable-format" checked={enableFormat} onCheckedChange={(val) => setEnableFormat(!!val)} />
+                    <Label htmlFor="enable-format" className="text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer">Format Cible</Label>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     {FORMATS.slice(0, 4).map((f) => (
                       <button
+                        disabled={!enableFormat}
                         key={f.id}
                         onClick={() => setTargetFormat(f.id)}
-                        className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all
-                          ${targetFormat === f.id 
+                        className={cn(
+                          "flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all",
+                          !enableFormat ? "cursor-not-allowed" : "cursor-pointer",
+                          enableFormat && targetFormat === f.id 
                             ? 'border-indigo-500 bg-indigo-50/50 shadow-sm' 
                             : 'border-slate-100 bg-white hover:border-slate-200'
-                          }`}
+                        )}
                       >
-                        <span className={`text-xs font-bold ${targetFormat === f.id ? 'text-indigo-600' : 'text-slate-600'}`}>{f.label}</span>
+                        <span className={cn(
+                          "text-xs font-bold",
+                          enableFormat && targetFormat === f.id ? 'text-indigo-600' : 'text-slate-600'
+                        )}>{f.label}</span>
                         {f.badge && <span className="text-[8px] text-indigo-400 font-bold uppercase">{f.badge}</span>}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-400">Dimensions</Label>
+                <Separator className="bg-slate-100" />
+
+                <div className={cn("space-y-4 transition-opacity", !enableResize && "opacity-50")}>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="enable-resize" checked={enableResize} onCheckedChange={(val) => setEnableResize(!!val)} />
+                    <Label htmlFor="enable-resize" className="text-xs font-bold uppercase tracking-wider text-slate-400 cursor-pointer">Dimensions</Label>
+                  </div>
                   
                   <div className="flex gap-2 mb-4 flex-wrap">
                     {PRESETS.map((p) => (
                       <button
+                        disabled={!enableResize}
                         key={p.id}
                         onClick={() => applyPreset(p)}
                         className={cn(
-                          "flex-1 flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all hover:bg-slate-50 max-w-20",
-                          width === p.width && height === p.height
+                          "flex-1 flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-all max-w-20",
+                          !enableResize ? "cursor-not-allowed opacity-50" : "hover:bg-slate-50 cursor-pointer",
+                          enableResize && width === p.width && height === p.height
                             ? "border-indigo-200 bg-indigo-50/50 text-indigo-600 shadow-sm"
                             : "border-slate-100 bg-white text-slate-500"
                         )}
@@ -307,7 +362,8 @@ export default function Home() {
                         Largeur                  
                       </p>
                       <Input 
-                        type="number" placeholder="Largeur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
+                        disabled={!enableResize}
+                        type="number" placeholder="Auto" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
                         value={width} onChange={(e) => setWidth(e.target.value)} 
                       />
                     </div>
@@ -316,7 +372,8 @@ export default function Home() {
                         Hauteur                  
                       </p>
                       <Input 
-                        type="number" placeholder="Hauteur" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
+                        disabled={!enableResize}
+                        type="number" placeholder="Auto" className="h-10 text-sm bg-slate-50/50 border-slate-100 focus:bg-white transition-colors" 
                         value={height} onChange={(e) => setHeight(e.target.value)} 
                       />
                     </div>
@@ -342,9 +399,6 @@ export default function Home() {
                       <Download className="w-4 h-4 mr-2" />
                       Tout télécharger
                     </Button>
-                    <p className="text-[10px] text-slate-400 text-center px-2 leading-tight">
-                      Note : Si un seul fichier se télécharge, autorisez les téléchargements multiples dans les réglages.
-                    </p>
                   </div>
                 )}
               </CardFooter>
@@ -372,11 +426,16 @@ export default function Home() {
                     File d&apos;attente ({tasks.length})
                   </span>
                 </div>
-                {tasks.some(t => t.status === 'completed') && (
-                  <Button variant="ghost" size="sm" onClick={clearCompleted} className="text-xs text-slate-400 hover:text-slate-600">
-                    Effacer terminés
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={clearAllTasks} className="text-xs text-red-400 hover:text-red-600 hover:bg-red-50">
+                    Vider la liste
                   </Button>
-                )}
+                  {tasks.some(t => t.status === 'completed') && (
+                    <Button variant="ghost" size="sm" onClick={clearCompleted} className="text-xs text-slate-400 hover:text-slate-600">
+                      Effacer terminés
+                    </Button>
+                  )}
+                </div>
               </div>
 
               <AnimatePresence initial={false}>
