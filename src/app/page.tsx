@@ -66,6 +66,7 @@ export default function Home() {
   const [targetFormat, setTargetFormat] = useState<string>('jpg');
   const [quality, setQuality] = useState<number>(80);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   // Toggles for features
   const [enableResize, setEnableResize] = useState(true);
@@ -74,17 +75,40 @@ export default function Home() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      const newTasks: ConversionTask[] = newFiles.map(file => ({
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const addFiles = (files: File[]) => {
+    const newTasks: ConversionTask[] = files
+      .filter(file => file.type.startsWith('image/'))
+      .map(file => ({
         id: Math.random().toString(36).substr(2, 9),
         file,
         preview: URL.createObjectURL(file),
         status: 'original',
         format: targetFormat
       }));
-      setTasks(prev => [...prev, ...newTasks]);
+    setTasks(prev => [...prev, ...newTasks]);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      addFiles(Array.from(e.target.files));
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -408,14 +432,29 @@ export default function Home() {
           <div className="lg:col-span-8 space-y-6">
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="group border-2 border-dashed border-slate-200 bg-white/50 hover:bg-white hover:border-indigo-400 rounded-2xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-sm"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={cn(
+                "group border-2 border-dashed rounded-2xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center text-center shadow-sm",
+                isDragging 
+                  ? "border-indigo-500 bg-indigo-50/50 scale-[1.02]" 
+                  : "border-slate-200 bg-white/50 hover:bg-white hover:border-indigo-400"
+              )}
             >
               <input ref={fileInputRef} type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+              <div className={cn(
+                "w-12 h-12 rounded-full flex items-center justify-center mb-3 transition-transform",
+                isDragging ? "bg-indigo-500 text-white scale-110" : "bg-indigo-50 text-indigo-600 group-hover:scale-110"
+              )}>
                 <Upload className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-slate-700">Ajouter des images</h3>
-              <p className="text-sm text-slate-400">Glissez-déposez ou cliquez pour parcourir</p>
+              <h3 className="font-bold text-slate-700">
+                {isDragging ? "Lâchez pour ajouter" : "Ajouter des images"}
+              </h3>
+              <p className="text-sm text-slate-400">
+                {isDragging ? "Images détectées" : "Glissez-déposez ou cliquez pour parcourir"}
+              </p>
             </div>
 
             <div className="space-y-3">

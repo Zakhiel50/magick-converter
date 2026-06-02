@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Magic Converter',
-    short_name: 'MagickConv',
+    name: 'Magic Converter 1.0.1',
+    short_name: 'MagickConv_1.0.1',
     description: 'Transformez vos images par lots en quelques secondes',
     start_url: '/',
     display: 'standalone',
