@@ -23,12 +23,16 @@ import {
   Sparkles,
   Monitor,
   Tablet,
-  Smartphone
+  Smartphone,
+  FileArchive,
+  Files
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import JSZip from 'jszip';
 
 type ConversionStatus = 'original' | 'processing' | 'completed' | 'error';
+type DownloadMode = 'individual' | 'zip';
 
 interface ConversionTask {
   id: string;
@@ -66,7 +70,9 @@ export default function Home() {
   const [targetFormat, setTargetFormat] = useState<string>('jpg');
   const [quality, setQuality] = useState<number>(80);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   
   // Toggles for features
   const [enableResize, setEnableResize] = useState(true);
@@ -194,14 +200,48 @@ export default function Home() {
     document.body.removeChild(a);
   };
 
-  const downloadAllFiles = async () => {
+  const handleDownloadClick = () => {
+    setShowDownloadModal(true);
+  };
+
+  const confirmDownload = async (mode: DownloadMode) => {
+    setShowDownloadModal(false);
     const completedTasks = tasks.filter(t => t.status === 'completed' && t.resultUrl);
     if (completedTasks.length === 0) return;
 
-    for (let i = 0; i < completedTasks.length; i++) {
-      downloadTask(completedTasks[i]);
-      if (i < completedTasks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    if (mode === 'zip') {
+      setIsDownloadingAll(true);
+      try {
+        const zip = new JSZip();
+        
+        completedTasks.forEach(task => {
+          if (task.resultBlob) {
+            const baseName = task.file.name.substring(0, task.file.name.lastIndexOf('.')) || task.file.name;
+            zip.file(`${baseName}.${task.format}`, task.resultBlob);
+          }
+        });
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `images_converties_${new Date().getTime()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Erreur lors de la création du ZIP:', error);
+      } finally {
+        setIsDownloadingAll(false);
+      }
+    } else {
+      for (let i = 0; i < completedTasks.length; i++) {
+        downloadTask(completedTasks[i]);
+        if (i < completedTasks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
     }
   };
@@ -418,10 +458,11 @@ export default function Home() {
                     <Button 
                       variant="outline" 
                       className="w-full h-12 border-slate-200 hover:bg-slate-50 font-bold rounded-xl"
-                      onClick={downloadAllFiles}
+                      onClick={handleDownloadClick}
+                      disabled={isDownloadingAll}
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Tout télécharger
+                      {isDownloadingAll ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+                      {isDownloadingAll ? 'Création du ZIP...' : 'Tout télécharger'}
                     </Button>
                   </div>
                 )}
@@ -565,6 +606,71 @@ export default function Home() {
           </div>
         </div>
       </motion.div>
+
+      {/* Download Selection Modal */}
+      <AnimatePresence>
+        {showDownloadModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowDownloadModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100"
+            >
+              <div className="p-6 text-center">
+                <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Download className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Choisir le mode de téléchargement</h3>
+                <p className="text-slate-500 text-sm mb-6">Comment souhaitez-vous récupérer vos {tasks.filter(t => t.status === 'completed').length} images ?</p>
+                
+                <div className="grid grid-cols-1 gap-3">
+                  <button
+                    onClick={() => confirmDownload('individual')}
+                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/30 transition-all text-left group cursor-pointer"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                      <Files className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-700 transition-colors group-hover:text-indigo-600">Un par un</p>
+                      <p className="text-xs text-slate-400">Téléchargement automatique fichier par fichier</p>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => confirmDownload('zip')}
+                    className="flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 hover:border-indigo-500 hover:bg-indigo-50/30 transition-all text-left group cursor-pointer"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                      <FileArchive className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-700 transition-colors group-hover:text-indigo-600">Archive ZIP</p>
+                      <p className="text-xs text-slate-400">Toutes les images compressées dans un seul fichier</p>
+                    </div>
+                  </button>
+                </div>
+
+                <Button 
+                  variant="ghost" 
+                  className="mt-4 w-full text-slate-400 hover:text-slate-600 cursor-pointer"
+                  onClick={() => setShowDownloadModal(false)}
+                >
+                  Annuler
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
